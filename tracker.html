@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seguimiento Vehicular</title>
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+  </script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #111;
+      color: #fff;
+    }
+
+    #map {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="info">
+  🚗 <b>Seguimiento en tiempo real</b><br>
+  📡 Actualizando ubicación...
+</div>
+
+<div id="map"></div>
+
+<script>
+  // ================= GET PARAMS =================
+  const params = new URLSearchParams(window.location.search);
+  let lat = parseFloat(params.get("lat"));
+  let lon = parseFloat(params.get("lon"));
+
+  if (isNaN(lat) || isNaN(lon)) {
+    alert("Coordenadas no válidas");
+  }
+
+  // ================= MAP =================
+  const map = L.map("map").setView([lat, lon], 17);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  // ================= MARKER =================
+  const vehicleIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+
+  let marker = L.marker([lat, lon], { icon: vehicleIcon }).addTo(map);
+
+  // ================= PATH =================
+  let pathCoords = [];
+  let polyline = L.polyline(pathCoords, {
+    color: "red",
+    weight: 4
+  }).addTo(map);
+
+  // ================= UPDATE FUNCTION =================
+  function updatePosition(newLat, newLon) {
+    const newPos = [newLat, newLon];
+    marker.setLatLng(newPos);
+    pathCoords.push(newPos);
+    polyline.setLatLngs(pathCoords);
+    map.panTo(newPos);
+  }
+
+  // ================= SIMULATED UPDATE =================
+  // El receptor irá actualizando el link
+  // Cada vez que abras el link, se centra en la última posición
+
+  updatePosition(lat, lon);
+
+</script>
+
+</body>
+</html>
