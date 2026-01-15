@@ -40,7 +40,9 @@ body {
 // ================= CONFIG =================
 const POSITION_URL =
   "https://raw.githubusercontent.com/KVMS14/vehicle-traker/main/position.json";
+
 const POLL_INTERVAL = 3000;
+const SIGNAL_TIMEOUT = 10000;
 
 // ================= MAP ====================
 const map = L.map('map').setView([0, 0], 16);
@@ -52,9 +54,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let marker = null;
 let path = L.polyline([], { color: 'red' }).addTo(map);
 
-let lastLat = null;
-let lastLon = null;
 let lastTracking = false;
+let lastUpdateTime = 0;
 
 // ================= POLLING =================
 async function pollPosition() {
@@ -69,16 +70,19 @@ async function pollPosition() {
     const lat = data.lat;
     const lon = data.lon;
     const tracking = data.tracking;
-    const time = data.time;
 
     if (lat === undefined || lon === undefined) return;
 
-    // 🔴 Tracking detenido
+    lastUpdateTime = Date.now();
+
+    // ⛔ Tracking detenido
     if (!tracking) {
       if (lastTracking) {
         path.setLatLngs([]);
-        lastLat = null;
-        lastLon = null;
+        if (marker) {
+          map.removeLayer(marker);
+          marker = null;
+        }
         document.getElementById("status").innerHTML =
           "⛔ Seguimiento detenido";
       }
@@ -86,7 +90,7 @@ async function pollPosition() {
       return;
     }
 
-    // 🟢 Nuevo tracking iniciado
+    // 🟢 Nuevo tracking
     if (!lastTracking && tracking) {
       path.setLatLngs([]);
       marker = null;
@@ -107,10 +111,8 @@ async function pollPosition() {
       "🚗 VEHÍCULO EN MOVIMIENTO<br>" +
       "LAT: " + lat.toFixed(6) + "<br>" +
       "LON: " + lon.toFixed(6) + "<br>" +
-      "⏱️ " + new Date(time * 1000).toLocaleTimeString();
+      "⏱️ " + new Date().toLocaleTimeString();
 
-    lastLat = lat;
-    lastLon = lon;
     lastTracking = true;
 
   } catch (e) {
@@ -118,9 +120,18 @@ async function pollPosition() {
   }
 }
 
+// ================= SIGNAL TIMEOUT =================
+setInterval(() => {
+  if (lastTracking && Date.now() - lastUpdateTime > SIGNAL_TIMEOUT) {
+    document.getElementById("status").innerHTML =
+      "⚠️ Señal perdida";
+  }
+}, 2000);
+
 // ================= LOOP ====================
 setInterval(pollPosition, POLL_INTERVAL);
 </script>
 
 </body>
 </html>
+
