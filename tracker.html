@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Seguimiento Vehicular</title>
 
   <!-- Leaflet -->
@@ -9,6 +9,7 @@
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
+
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
   </script>
@@ -17,86 +18,103 @@
     body {
       margin: 0;
       font-family: Arial, Helvetica, sans-serif;
-      background: #111;
-      color: #fff;
+      background: #0b132b;
+      color: white;
     }
 
     #map {
-      width: 100vw;
       height: 100vh;
+      width: 100vw;
     }
 
-    .info {
+    .status {
       position: absolute;
       top: 10px;
       left: 10px;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0, 0, 0, 0.75);
       padding: 10px;
-      border-radius: 6px;
-      font-size: 14px;
+      border-radius: 8px;
       z-index: 1000;
+      font-size: 14px;
     }
   </style>
 </head>
 
 <body>
 
-<div class="info">
-  🚗 <b>Seguimiento en tiempo real</b><br>
-  📡 Actualizando ubicación...
-</div>
-
 <div id="map"></div>
 
+<div class="status" id="status">
+  🚗 Esperando datos GPS...
+</div>
+
 <script>
-  // ================= GET PARAMS =================
-  const params = new URLSearchParams(window.location.search);
-  let lat = parseFloat(params.get("lat"));
-  let lon = parseFloat(params.get("lon"));
+  // ================= CONFIG =================
+  const POSITION_URL = "position.json"; // mismo repo
+  const POLL_INTERVAL = 3000; // ms
 
-  if (isNaN(lat) || isNaN(lon)) {
-    alert("Coordenadas no válidas");
-  }
+  // ================= MAP ====================
+  const map = L.map('map').setView([0, 0], 16);
 
-  // ================= MAP =================
-  const map = L.map("map").setView([lat, lon], 17);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap"
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // ================= MARKER =================
-  const vehicleIcon = L.icon({
-    iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  });
+  let marker = null;
+  let path = L.polyline([], { color: 'red' }).addTo(map);
 
-  let marker = L.marker([lat, lon], { icon: vehicleIcon }).addTo(map);
+  let lastLat = null;
+  let lastLon = null;
 
-  // ================= PATH =================
-  let pathCoords = [];
-  let polyline = L.polyline(pathCoords, {
-    color: "red",
-    weight: 4
-  }).addTo(map);
+  // ================= POLLING =================
+  async function pollPosition() {
+    try {
+      const response = await fetch(
+        POSITION_URL + "?t=" + Date.now() // evita cache
+      );
 
-  // ================= UPDATE FUNCTION =================
-  function updatePosition(newLat, newLon) {
-    const newPos = [newLat, newLon];
-    marker.setLatLng(newPos);
-    pathCoords.push(newPos);
-    polyline.setLatLngs(pathCoords);
-    map.panTo(newPos);
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      const lat = data.lat;
+      const lon = data.lon;
+      const time = data.time;
+
+      if (!lat || !lon) return;
+
+      // Si la posición cambió
+      if (lat !== lastLat || lon !== lastLon) {
+
+        const latLng = [lat, lon];
+
+        // Primer punto
+        if (!marker) {
+          marker = L.marker(latLng).addTo(map);
+          map.setView(latLng, 18);
+        } else {
+          marker.setLatLng(latLng);
+        }
+
+        path.addLatLng(latLng);
+
+        document.getElementById("status").innerHTML =
+          "📍 Posición actual<br>" +
+          "LAT: " + lat.toFixed(6) + "<br>" +
+          "LON: " + lon.toFixed(6) + "<br>" +
+          "⏱️ " + new Date(time * 1000).toLocaleTimeString();
+
+        lastLat = lat;
+        lastLon = lon;
+      }
+
+    } catch (err) {
+      console.error("Error polling:", err);
+    }
   }
 
-  // ================= SIMULATED UPDATE =================
-  // El receptor irá actualizando el link
-  // Cada vez que abras el link, se centra en la última posición
-
-  updatePosition(lat, lon);
-
+  // ================= LOOP ====================
+  setInterval(pollPosition, POLL_INTERVAL);
 </script>
 
 </body>
