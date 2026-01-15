@@ -1,7 +1,6 @@
 {
   "lat": 0,
   "lon": 0,
-  "time": 0,
-  "tracking": false
+  "tracking": false,
+  "timestamp": 0
 }
-
